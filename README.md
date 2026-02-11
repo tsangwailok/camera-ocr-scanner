@@ -6,6 +6,7 @@ A Progressive Web App that provides advanced document scanning capabilities with
 
 - 📷 **Camera Control**: Full control over device camera with video preview
 - 💡 **Flash Support**: Toggle device flashlight during capture (where supported)
+- 🔧 **Perspective Correction**: Drag the 4 corners of captured images to correct distortion
 - 🔍 **Edge Detection**: Advanced Canny edge detection algorithm for document boundary detection
 - 📝 **OCR Processing**: Extract text from images using Tesseract.js
 - 📋 **Text Copy**: Copy extracted text to clipboard with one click
@@ -17,7 +18,8 @@ A Progressive Web App that provides advanced document scanning capabilities with
 
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
 - **Camera API**: MediaDevices API (getUserMedia)
-- **Edge Detection**: Canvas-based Canny edge detection algorithm
+- **Perspective Correction**: OpenCV.js for geometric transformations
+- **Edge Detection**: Canvas-based Canny edge detection algorithm (pure JavaScript)
 - **OCR**: Tesseract.js (JavaScript implementation of Tesseract)
 - **PWA**: Service Workers, Web Manifest, Cache-first strategy
 - **Browser Storage**: IndexedDB for caching
@@ -73,10 +75,14 @@ npx http-server
 1. **Start Camera**: Click "📷 Start Camera" to request camera access
 2. **Enable Flash** (optional): Click "💡 Flash Off" to toggle the flashlight
 3. **Capture Image**: Click "📸 Capture" to take a photo
-4. **Process Image**:
-   - Click "🔍 Edge Detection" to highlight document boundaries
-   - Click "📝 Extract Text (OCR)" to recognize text in the image
-5. **Copy Results**: Click "📋 Copy Text" to copy extracted text to clipboard
+4. **Adjust Corners** (optional): Drag the red corner points to align with document edges
+5. **Correct Perspective** (optional): Click "🔧 Correct Perspective" to straighten the image
+6. **Process Image**:
+   - Click "🔍 Detect Edge" to apply edge detection to the image
+   - Click "📝 OCR Text" to extract text from the image
+7. **View Results**: OCR text appears in the textarea below
+8. **Copy Results**: Click "📋 Copy Text" to copy extracted text to clipboard
+9. **Reset**: Click "🔄 Reset" to return to camera view
 
 ### Keyboard Shortcuts (Future Enhancement)
 
@@ -124,7 +130,6 @@ The app uses a **cache-first** service worker strategy:
 
 ## Performance Optimization
 
-- **Lazy Loading**: Tesseract.js and OpenCV loaded on demand
 - **Canvas Optimization**: Images processed at native device resolution
 - **Caching Strategy**: Service worker caches essential files
 - **Image Compression**: Captured images use JPEG compression
@@ -187,7 +192,7 @@ camera-ocr-scanner/
 │   ├── app.js               # Main application logic
 │   └── service-worker.js    # Service worker for offline support
 └── images/
-    └── icons/               # App icons (placeholder)
+    └── icons/               # App icons
 ```
 
 ## License

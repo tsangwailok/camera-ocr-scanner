@@ -7,14 +7,16 @@ const state = {
     flashEnabled: false,
     cameraActive: false,
     ocrWorker: null,
+    corners: [], // for perspective correction
+    dragging: false,
+    dragIndex: -1,
+    cvReady: false
 };
 
 // DOM Elements
 const elements = {
     video: document.getElementById('cameraFeed'),
     previewCanvas: document.getElementById('previewCanvas'),
-    originalCanvas: document.getElementById('originalCanvas'),
-    edgeCanvas: document.getElementById('edgeCanvas'),
     ocrResults: document.getElementById('ocrResults'),
     statusMessage: document.getElementById('statusMessage'),
     processingIndicator: document.getElementById('processingIndicator'),
@@ -22,10 +24,13 @@ const elements = {
     stopCameraBtn: document.getElementById('stopCameraBtn'),
     captureBtn: document.getElementById('captureBtn'),
     flashBtn: document.getElementById('flashBtn'),
+    correctPerspectiveBtn: document.getElementById('correctPerspectiveBtn'),
     edgeDetectBtn: document.getElementById('edgeDetectBtn'),
     ocrBtn: document.getElementById('ocrBtn'),
     resetBtn: document.getElementById('resetBtn'),
     copyBtn: document.getElementById('copyBtn'),
+    overlayTextInput: document.getElementById('overlayTextInput'),
+    applyOverlayBtn: document.getElementById('applyOverlayBtn'),
 };
 
 // Initialize Service Worker
@@ -40,18 +45,39 @@ async function initServiceWorker() {
     }
 }
 
+// OpenCV Ready
+function onOpenCvReady() {
+    state.cvReady = true;
+    console.log('OpenCV.js is ready');
+}
+
 // Initialize OCR Worker
 async function initOCR() {
     try {
+        if (typeof Tesseract === 'undefined') {
+            throw new Error('Tesseract.js library not loaded');
+        }
         state.ocrWorker = await Tesseract.createWorker();
+        await state.ocrWorker.loadLanguage('eng');
+        await state.ocrWorker.initialize('eng');
         console.log('OCR Worker initialized');
     } catch (error) {
         console.error('OCR Worker initialization failed:', error);
+        throw error;
     }
+}
+
+// Check for camera API support
+function isCameraSupported() {
+    return !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function');
 }
 
 // Start Camera
 async function startCamera() {
+    if (!isCameraSupported()) {
+        showStatus('Camera API not supported on this device/browser.', 'error');
+        return;
+    }
     try {
         showStatus('Requesting camera access...', 'info');
         
@@ -110,10 +136,29 @@ function captureImage() {
     // Get image data
     state.currentImage = state.canvas.toDataURL('image/jpeg');
     
-    // Display in original canvas
-    displayImage(elements.originalCanvas, state.canvas);
+    // Set corners for perspective correction
+    state.corners = [
+        { x: 0, y: 0 },
+        { x: state.canvas.width, y: 0 },
+        { x: state.canvas.width, y: state.canvas.height },
+        { x: 0, y: state.canvas.height }
+    ];
+    
+    // Hide video and show captured image
+    elements.video.style.display = 'none';
+    elements.previewCanvas.style.display = 'block';
+    
+    // Draw image with corners
+    drawImageWithCorners();
+    
+    // Add mouse event listeners for dragging
+    elements.previewCanvas.addEventListener('mousedown', handleMouseDown);
+    elements.previewCanvas.addEventListener('mousemove', handleMouseMove);
+    elements.previewCanvas.addEventListener('mouseup', handleMouseUp);
+    elements.previewCanvas.addEventListener('mouseleave', handleMouseUp);
     
     // Enable processing buttons
+    elements.correctPerspectiveBtn.disabled = false;
     elements.edgeDetectBtn.disabled = false;
     elements.ocrBtn.disabled = false;
     elements.copyBtn.disabled = true;
@@ -121,12 +166,155 @@ function captureImage() {
     showStatus('Image captured successfully', 'success');
 }
 
-// Display Image on Canvas
-function displayImage(canvas, sourceCanvas) {
-    const ctx = canvas.getContext('2d');
-    canvas.width = sourceCanvas.width;
-    canvas.height = sourceCanvas.height;
-    ctx.drawImage(sourceCanvas, 0, 0);
+// Draw image with draggable corners
+function drawImageWithCorners() {
+    if (!state.canvas || !state.currentImage) return;
+    
+    const ctx = state.context;
+    const img = new Image();
+    img.onload = () => {
+        ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        ctx.drawImage(img, 0, 0);
+        
+        // Draw corners
+        ctx.fillStyle = 'red';
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 2;
+        state.corners.forEach(corner => {
+            ctx.beginPath();
+            ctx.arc(corner.x, corner.y, 10, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+        });
+    };
+    img.src = state.currentImage;
+}
+
+// Get mouse position relative to canvas
+function getMousePos(canvas, evt) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+        x: evt.clientX - rect.left,
+        y: evt.clientY - rect.top
+    };
+}
+
+// Check if point is in circle
+function isInCircle(point, center, radius) {
+    const dx = point.x - center.x;
+    const dy = point.y - center.y;
+    return dx * dx + dy * dy <= radius * radius;
+}
+
+// Mouse event handlers for dragging corners
+function handleMouseDown(evt) {
+    const mousePos = getMousePos(elements.previewCanvas, evt);
+    state.dragIndex = -1;
+    for (let i = 0; i < state.corners.length; i++) {
+        if (isInCircle(mousePos, state.corners[i], 10)) {
+            state.dragging = true;
+            state.dragIndex = i;
+            break;
+        }
+    }
+}
+
+function handleMouseMove(evt) {
+    if (state.dragging && state.dragIndex >= 0) {
+        const mousePos = getMousePos(elements.previewCanvas, evt);
+        state.corners[state.dragIndex].x = mousePos.x;
+        state.corners[state.dragIndex].y = mousePos.y;
+        drawImageWithCorners();
+    }
+}
+
+function handleMouseUp() {
+    state.dragging = false;
+    state.dragIndex = -1;
+}
+
+// Correct Perspective
+function correctPerspective() {
+    if (!state.canvas || state.corners.length !== 4) {
+        showStatus('No image or corners defined', 'error');
+        return;
+    }
+
+    if (!state.cvReady) {
+        showStatus('OpenCV not loaded yet, please wait', 'error');
+        return;
+    }
+
+    showProcessing(true);
+
+    setTimeout(() => {
+        try {
+            const srcCanvas = state.canvas;
+            const srcImageData = srcCanvas.getContext('2d').getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+            
+            // Create OpenCV Mat from image data
+            const src = cv.matFromImageData(srcImageData);
+            
+            // Define source and destination points
+            const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                state.corners[0].x, state.corners[0].y,
+                state.corners[1].x, state.corners[1].y,
+                state.corners[2].x, state.corners[2].y,
+                state.corners[3].x, state.corners[3].y
+            ]);
+            
+            // Destination rectangle (A4 aspect ratio)
+            const destWidth = srcCanvas.width;
+            const destHeight = Math.round(destWidth * 1.414);
+            
+            const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                0, 0,
+                destWidth, 0,
+                destWidth, destHeight,
+                0, destHeight
+            ]);
+            
+            // Get perspective transform matrix
+            const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
+            
+            // Apply perspective transformation
+            const dst = new cv.Mat();
+            cv.warpPerspective(src, dst, M, new cv.Size(destWidth, destHeight), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+            
+            // Update canvas
+            state.canvas.width = destWidth;
+            state.canvas.height = destHeight;
+            cv.imshow(state.canvas, dst);
+            
+            // Update current image
+            state.currentImage = state.canvas.toDataURL('image/jpeg');
+            
+            // Reset corners
+            state.corners = [
+                { x: 0, y: 0 },
+                { x: destWidth, y: 0 },
+                { x: destWidth, y: destHeight },
+                { x: 0, y: destHeight }
+            ];
+            
+            // Redraw
+            drawImageWithCorners();
+            
+            // Clean up
+            src.delete();
+            srcPoints.delete();
+            dstPoints.delete();
+            M.delete();
+            dst.delete();
+            
+            showStatus('Perspective corrected successfully', 'success');
+        } catch (error) {
+            console.error('Perspective correction error:', error);
+            showStatus(`Perspective correction error: ${error.message}`, 'error');
+        }
+
+        showProcessing(false);
+    }, 100);
 }
 
 // Toggle Flash
@@ -175,7 +363,7 @@ function detectEdges() {
             const sourceCtx = sourceCanvas.getContext('2d');
             const sourceImageData = sourceCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
             
-            const edgeCanvas = elements.edgeCanvas;
+            const edgeCanvas = elements.previewCanvas;
             const edgeCtx = edgeCanvas.getContext('2d');
             edgeCanvas.width = sourceCanvas.width;
             edgeCanvas.height = sourceCanvas.height;
@@ -186,6 +374,9 @@ function detectEdges() {
             applyCannyEdgeDetection(sourceImageData, edgeImageData);
             
             edgeCtx.putImageData(edgeImageData, 0, 0);
+            
+            // Update current image for OCR
+            state.currentImage = edgeCanvas.toDataURL('image/jpeg');
             
             elements.edgeDetectBtn.disabled = false;
             showStatus('Edge detection completed', 'success');
@@ -299,7 +490,8 @@ async function extractTextOCR() {
         showStatus('OCR completed successfully', 'success');
     } catch (error) {
         console.error('OCR error:', error);
-        showStatus(`OCR error: ${error.message}`, 'error');
+        const errorMsg = error?.message || error?.toString() || 'Unknown error';
+        showStatus(`OCR error: ${errorMsg}`, 'error');
         elements.ocrResults.value = 'Error during text extraction. Please try again.';
     }
 
@@ -319,13 +511,64 @@ function copyResults() {
 }
 
 // Reset
-function reset() {
+async function reset() {
     state.currentImage = null;
-    elements.originalCanvas.getContext('2d').clearRect(0, 0, elements.originalCanvas.width, elements.originalCanvas.height);
-    elements.edgeCanvas.getContext('2d').clearRect(0, 0, elements.edgeCanvas.width, elements.edgeCanvas.height);
+    elements.previewCanvas.getContext('2d').clearRect(0, 0, elements.previewCanvas.width, elements.previewCanvas.height);
     elements.ocrResults.value = '';
+    state.corners = [];
+    
+    // Remove event listeners
+    elements.previewCanvas.removeEventListener('mousedown', handleMouseDown);
+    elements.previewCanvas.removeEventListener('mousemove', handleMouseMove);
+    elements.previewCanvas.removeEventListener('mouseup', handleMouseUp);
+    elements.previewCanvas.removeEventListener('mouseleave', handleMouseUp);
+    
+    // Terminate OCR worker to free memory
+    if (state.ocrWorker) {
+        await state.ocrWorker.terminate();
+        state.ocrWorker = null;
+    }
+    
+    // Show video and hide captured image
+    elements.video.style.display = 'block';
+    elements.previewCanvas.style.display = 'none';
+    
     updateButtonStates();
     showStatus('Reset complete', 'info');
+}
+
+// Overlay text on captured image
+function overlayTextOnImage() {
+    const text = elements.overlayTextInput.value.trim();
+    if (!state.canvas || !state.currentImage || !text) {
+        showStatus('No image or text to overlay.', 'error');
+        return;
+    }
+    const ctx = state.context;
+    const img = new Image();
+    img.onload = () => {
+        ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+        ctx.drawImage(img, 0, 0);
+        // Draw corners if present
+        if (state.corners && state.corners.length === 4) {
+            ctx.fillStyle = 'red';
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 2;
+            state.corners.forEach(corner => {
+                ctx.beginPath();
+                ctx.arc(corner.x, corner.y, 10, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            });
+        }
+        // Overlay text
+        ctx.font = 'bold 32px Arial';
+        ctx.fillStyle = 'rgba(0,0,0,0.7)';
+        ctx.textAlign = 'center';
+        ctx.fillText(text, state.canvas.width / 2, state.canvas.height / 2);
+    };
+    img.src = state.currentImage;
+    showStatus('Overlay text applied.', 'success');
 }
 
 // Update Button States
@@ -335,6 +578,7 @@ function updateButtonStates() {
     elements.flashBtn.disabled = !state.cameraActive;
     
     if (!state.currentImage) {
+        elements.correctPerspectiveBtn.disabled = true;
         elements.edgeDetectBtn.disabled = true;
         elements.ocrBtn.disabled = true;
     }
@@ -357,10 +601,12 @@ elements.startCameraBtn.addEventListener('click', startCamera);
 elements.stopCameraBtn.addEventListener('click', stopCamera);
 elements.captureBtn.addEventListener('click', captureImage);
 elements.flashBtn.addEventListener('click', toggleFlash);
+elements.correctPerspectiveBtn.addEventListener('click', correctPerspective);
 elements.edgeDetectBtn.addEventListener('click', detectEdges);
 elements.ocrBtn.addEventListener('click', extractTextOCR);
 elements.resetBtn.addEventListener('click', reset);
 elements.copyBtn.addEventListener('click', copyResults);
+elements.applyOverlayBtn.addEventListener('click', overlayTextOnImage);
 
 // Handle video play to ensure camera is streaming
 elements.video.addEventListener('play', () => {

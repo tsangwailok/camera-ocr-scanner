@@ -21,6 +21,11 @@
         <main>
             <!-- Camera Section -->
             <section class="camera-section">
+                <div class="overlay-text-controls">
+                    <input type="text" id="overlayTextInput" placeholder="Enter text to overlay..." />
+                    <button id="applyOverlayBtn" class="btn btn-info">Overlay Text</button>
+                </div>
+
                 <div class="camera-container">
                     <video id="cameraFeed" autoplay playsinline></video>
                     <canvas id="previewCanvas" style="display: none;"></canvas>
@@ -44,31 +49,19 @@
 
             <!-- Image Processing Section -->
             <section class="processing-section">
-                <h2>Image Processing</h2>
                 <div class="processing-controls">
+                    <button id="correctPerspectiveBtn" class="btn btn-info" disabled>
+                        <span>🔧 Correct Perspective</span>
+                    </button>
                     <button id="edgeDetectBtn" class="btn btn-info" disabled>
-                        <span>🔍 Edge Detection</span>
+                        <span>🔍 Detect Edge</span>
                     </button>
                     <button id="ocrBtn" class="btn btn-info" disabled>
-                        <span>📝 Extract Text (OCR)</span>
+                        <span>📝 OCR Text</span>
                     </button>
                     <button id="resetBtn" class="btn btn-secondary">
                         <span>🔄 Reset</span>
                     </button>
-                </div>
-            </section>
-
-            <!-- Preview and Results Section -->
-            <section class="results-section">
-                <div class="grid">
-                    <div class="card">
-                        <h3>Original Image</h3>
-                        <canvas id="originalCanvas" class="result-canvas"></canvas>
-                    </div>
-                    <div class="card">
-                        <h3>Edge Detected</h3>
-                        <canvas id="edgeCanvas" class="result-canvas"></canvas>
-                    </div>
                 </div>
 
                 <div class="card full-width">
@@ -95,8 +88,8 @@
 
     <!-- Tesseract OCR Library -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
-    <!-- OpenCV for edge detection -->
-    <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
+    <!-- OpenCV for perspective correction -->
+    <script async src="https://docs.opencv.org/4.5.2/opencv.js" onload="onOpenCvReady()"></script>
     
     <script src="js/app.js"></script>
 </body>

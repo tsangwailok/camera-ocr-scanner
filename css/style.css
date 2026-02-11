@@ -196,12 +196,6 @@ video, canvas {
     gap: 20px;
 }
 
-.grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-}
-
 .card {
     border: 1px solid #ddd;
     border-radius: var(--border-radius);
@@ -210,16 +204,7 @@ video, canvas {
 }
 
 .card.full-width {
-    grid-column: 1 / -1;
-}
-
-.result-canvas {
     width: 100%;
-    height: auto;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    margin-top: 10px;
-    background-color: white;
 }
 
 textarea {
@@ -312,6 +297,12 @@ footer {
         font-size: 1em;
     }
 
+    .camera-container {
+        max-height: 60vh;
+        padding-top: 0;
+        height: 60vh;
+    }
+
     .controls,
     .processing-controls {
         grid-template-columns: 1fr 1fr;
@@ -335,6 +326,12 @@ footer {
         font-size: 1.5em;
     }
 
+    .camera-container {
+        max-height: 50vh;
+        padding-top: 0;
+        height: 50vh;
+    }
+
     .controls,
     .processing-controls {
         grid-template-columns: 1fr;
@@ -354,9 +351,5 @@ footer {
 @media print {
     header, footer, .controls, .processing-controls, .btn {
         display: none;
-    }
-
-    .result-canvas {
-        page-break-inside: avoid;
     }
 }
