@@ -1,0 +1,76 @@
+{
+  "name": "Camera OCR Scanner",
+  "short_name": "OCR Scanner",
+  "description": "A Progressive Web App for scanning documents with camera control, flash support, and edge detection for OCR",
+  "start_url": "/index.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2196F3",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%232196F3' width='192' height='192'/><text x='50%' y='50%' font-size='100' font-weight='bold' fill='white' text-anchor='middle' dy='.3em'>📸</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect fill='%232196F3' width='512' height='512'/><text x='50%' y='50%' font-size='300' font-weight='bold' fill='white' text-anchor='middle' dy='.3em'>📸</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect fill='%232196F3' width='540' height='720'/><text x='50%' y='50%' font-size='100' font-weight='bold' fill='white' text-anchor='middle' dy='.3em'>📸 OCR Scanner</text></svg>",
+      "sizes": "540x720",
+      "type": "image/svg+xml",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1280 720'><rect fill='%232196F3' width='1280' height='720'/><text x='50%' y='50%' font-size='100' font-weight='bold' fill='white' text-anchor='middle' dy='.3em'>📸 OCR Scanner</text></svg>",
+      "sizes": "1280x720",
+      "type": "image/svg+xml",
+      "form_factor": "wide"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Start Scanning",
+      "short_name": "Scan",
+      "description": "Start camera and begin scanning documents",
+      "url": "/index.html?action=scan",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'><rect fill='%232196F3' width='96' height='96'/><text x='50%' y='50%' font-size='50' font-weight='bold' fill='white' text-anchor='middle' dy='.3em'>📸</text></svg>",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "share_target": {
+    "action": "/share",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "image",
+          "accept": ["image/*"]
+        }
+      ]
+    }
+  },
+  "permissions": [
+    "camera",
+    "clipboard-read",
+    "clipboard-write"
+  ]
+}

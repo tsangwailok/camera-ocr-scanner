@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PWA for camera control with OCR edge detection">
+    <meta name="theme-color" content="#2196F3">
+    <title>Camera OCR Scanner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="images/icon-192x192.png">
+    <link rel="apple-touch-icon" href="images/icon-192x192.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📸 Camera OCR Scanner</h1>
+            <p>Scan documents with edge detection</p>
+        </header>
+
+        <main>
+            <!-- Camera Section -->
+            <section class="camera-section">
+                <div class="camera-container">
+                    <video id="cameraFeed" autoplay playsinline></video>
+                    <canvas id="previewCanvas" style="display: none;"></canvas>
+                </div>
+
+                <div class="controls">
+                    <button id="startCameraBtn" class="btn btn-primary">
+                        <span>📷 Start Camera</span>
+                    </button>
+                    <button id="stopCameraBtn" class="btn btn-secondary" disabled>
+                        <span>⏹ Stop Camera</span>
+                    </button>
+                    <button id="captureBtn" class="btn btn-success" disabled>
+                        <span>📸 Capture</span>
+                    </button>
+                    <button id="flashBtn" class="btn btn-warning" disabled>
+                        <span>💡 Flash Off</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Image Processing Section -->
+            <section class="processing-section">
+                <h2>Image Processing</h2>
+                <div class="processing-controls">
+                    <button id="edgeDetectBtn" class="btn btn-info" disabled>
+                        <span>🔍 Edge Detection</span>
+                    </button>
+                    <button id="ocrBtn" class="btn btn-info" disabled>
+                        <span>📝 Extract Text (OCR)</span>
+                    </button>
+                    <button id="resetBtn" class="btn btn-secondary">
+                        <span>🔄 Reset</span>
+                    </button>
+                </div>
+            </section>
+
+            <!-- Preview and Results Section -->
+            <section class="results-section">
+                <div class="grid">
+                    <div class="card">
+                        <h3>Original Image</h3>
+                        <canvas id="originalCanvas" class="result-canvas"></canvas>
+                    </div>
+                    <div class="card">
+                        <h3>Edge Detected</h3>
+                        <canvas id="edgeCanvas" class="result-canvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="card full-width">
+                    <h3>OCR Results</h3>
+                    <textarea id="ocrResults" placeholder="Extracted text will appear here..." readonly></textarea>
+                    <button id="copyBtn" class="btn btn-small" disabled>📋 Copy Text</button>
+                </div>
+            </section>
+
+            <!-- Status Section -->
+            <section class="status-section">
+                <div id="statusMessage" class="status-message"></div>
+                <div id="processingIndicator" class="processing-indicator" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>Processing...</p>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>Camera OCR Scanner v1.0 | Works Offline</p>
+        </footer>
+    </div>
+
+    <!-- Tesseract OCR Library -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <!-- OpenCV for edge detection -->
+    <script async src="https://docs.opencv.org/4.5.2/opencv.js"></script>
+    
+    <script src="js/app.js"></script>
+</body>
+</html>
