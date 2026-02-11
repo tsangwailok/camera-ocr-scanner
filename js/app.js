@@ -151,11 +151,14 @@ function captureImage() {
     // Draw image with corners
     drawImageWithCorners();
     
-    // Add mouse event listeners for dragging
-    elements.previewCanvas.addEventListener('mousedown', handleMouseDown);
-    elements.previewCanvas.addEventListener('mousemove', handleMouseMove);
-    elements.previewCanvas.addEventListener('mouseup', handleMouseUp);
-    elements.previewCanvas.addEventListener('mouseleave', handleMouseUp);
+    // Add mouse and touch event listeners for dragging
+    elements.previewCanvas.addEventListener('mousedown', handlePointerDown);
+    elements.previewCanvas.addEventListener('mousemove', handlePointerMove);
+    elements.previewCanvas.addEventListener('mouseup', handlePointerUp);
+    elements.previewCanvas.addEventListener('mouseleave', handlePointerUp);
+    elements.previewCanvas.addEventListener('touchstart', handlePointerDown);
+    elements.previewCanvas.addEventListener('touchmove', handlePointerMove);
+    elements.previewCanvas.addEventListener('touchend', handlePointerUp);
     
     // Enable processing buttons
     elements.correctPerspectiveBtn.disabled = false;
@@ -190,12 +193,20 @@ function drawImageWithCorners() {
     img.src = state.currentImage;
 }
 
-// Get mouse position relative to canvas
-function getMousePos(canvas, evt) {
+// Get position from mouse or touch event
+function getEventPos(canvas, evt) {
     const rect = canvas.getBoundingClientRect();
+    let clientX, clientY;
+    if (evt.touches && evt.touches.length > 0) {
+        clientX = evt.touches[0].clientX;
+        clientY = evt.touches[0].clientY;
+    } else {
+        clientX = evt.clientX;
+        clientY = evt.clientY;
+    }
     return {
-        x: evt.clientX - rect.left,
-        y: evt.clientY - rect.top
+        x: clientX - rect.left,
+        y: clientY - rect.top
     };
 }
 
@@ -207,11 +218,12 @@ function isInCircle(point, center, radius) {
 }
 
 // Mouse event handlers for dragging corners
-function handleMouseDown(evt) {
-    const mousePos = getMousePos(elements.previewCanvas, evt);
+function handlePointerDown(evt) {
+    evt.preventDefault(); // Prevent scrolling on touch
+    const pos = getEventPos(elements.previewCanvas, evt);
     state.dragIndex = -1;
     for (let i = 0; i < state.corners.length; i++) {
-        if (isInCircle(mousePos, state.corners[i], 10)) {
+        if (isInCircle(pos, state.corners[i], 10)) {
             state.dragging = true;
             state.dragIndex = i;
             break;
@@ -219,16 +231,17 @@ function handleMouseDown(evt) {
     }
 }
 
-function handleMouseMove(evt) {
+function handlePointerMove(evt) {
     if (state.dragging && state.dragIndex >= 0) {
-        const mousePos = getMousePos(elements.previewCanvas, evt);
-        state.corners[state.dragIndex].x = mousePos.x;
-        state.corners[state.dragIndex].y = mousePos.y;
+        evt.preventDefault();
+        const pos = getEventPos(elements.previewCanvas, evt);
+        state.corners[state.dragIndex].x = pos.x;
+        state.corners[state.dragIndex].y = pos.y;
         drawImageWithCorners();
     }
 }
 
-function handleMouseUp() {
+function handlePointerUp(evt) {
     state.dragging = false;
     state.dragIndex = -1;
 }
@@ -518,10 +531,13 @@ async function reset() {
     state.corners = [];
     
     // Remove event listeners
-    elements.previewCanvas.removeEventListener('mousedown', handleMouseDown);
-    elements.previewCanvas.removeEventListener('mousemove', handleMouseMove);
-    elements.previewCanvas.removeEventListener('mouseup', handleMouseUp);
-    elements.previewCanvas.removeEventListener('mouseleave', handleMouseUp);
+    elements.previewCanvas.removeEventListener('mousedown', handlePointerDown);
+    elements.previewCanvas.removeEventListener('mousemove', handlePointerMove);
+    elements.previewCanvas.removeEventListener('mouseup', handlePointerUp);
+    elements.previewCanvas.removeEventListener('mouseleave', handlePointerUp);
+    elements.previewCanvas.removeEventListener('touchstart', handlePointerDown);
+    elements.previewCanvas.removeEventListener('touchmove', handlePointerMove);
+    elements.previewCanvas.removeEventListener('touchend', handlePointerUp);
     
     // Terminate OCR worker to free memory
     if (state.ocrWorker) {
