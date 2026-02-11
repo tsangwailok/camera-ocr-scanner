@@ -388,6 +388,90 @@ function autoCorrectPerspective() {
     }, 100);
 }
 
+// Correct Perspective
+function correctPerspective() {
+    if (!state.canvas || state.corners.length !== 4) {
+        showStatus('No image or corners defined', 'error');
+        return;
+    }
+
+    if (!state.cvReady) {
+        showStatus('OpenCV not loaded yet, please wait', 'error');
+        return;
+    }
+
+    showProcessing(true);
+
+    setTimeout(() => {
+        try {
+            const srcCanvas = state.canvas;
+            const srcImageData = srcCanvas.getContext('2d').getImageData(0, 0, srcCanvas.width, srcCanvas.height);
+            
+            // Create OpenCV Mat from image data
+            const src = cv.matFromImageData(srcImageData);
+            
+            // Define source and destination points
+            const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                state.corners[0].x, state.corners[0].y,
+                state.corners[1].x, state.corners[1].y,
+                state.corners[2].x, state.corners[2].y,
+                state.corners[3].x, state.corners[3].y
+            ]);
+            
+            // Destination rectangle (A4 aspect ratio)
+            const destWidth = srcCanvas.width;
+            const destHeight = Math.round(destWidth * 1.414);
+            
+            const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                0, 0,
+                destWidth, 0,
+                destWidth, destHeight,
+                0, destHeight
+            ]);
+            
+            // Get perspective transform matrix
+            const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
+            
+            // Apply perspective transformation
+            const dst = new cv.Mat();
+            cv.warpPerspective(src, dst, M, new cv.Size(destWidth, destHeight), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+            
+            // Update canvas
+            state.canvas.width = destWidth;
+            state.canvas.height = destHeight;
+            cv.imshow(state.canvas, dst);
+            
+            // Update current image
+            state.currentImage = state.canvas.toDataURL('image/jpeg');
+            
+            // Reset corners
+            state.corners = [
+                { x: 0, y: 0 },
+                { x: destWidth, y: 0 },
+                { x: destWidth, y: destHeight },
+                { x: 0, y: destHeight }
+            ];
+            
+            // Redraw
+            drawImageWithCorners();
+            
+            // Clean up
+            src.delete();
+            srcPoints.delete();
+            dstPoints.delete();
+            M.delete();
+            dst.delete();
+            
+            showStatus('Perspective corrected successfully', 'success');
+        } catch (error) {
+            console.error('Perspective correction error:', error);
+            showStatus(`Perspective correction error: ${error.message}`, 'error');
+        }
+
+        showProcessing(false);
+    }, 100);
+}
+
 // Toggle Flash
 async function toggleFlash() {
     try {
