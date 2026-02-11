@@ -58,8 +58,8 @@ async function initOCR() {
             throw new Error('Tesseract.js library not loaded');
         }
         state.ocrWorker = await Tesseract.createWorker();
-        await state.ocrWorker.loadLanguage('eng');
-        await state.ocrWorker.initialize('eng');
+        await state.ocrWorker.loadLanguage('chi_sim+chi_tra');
+        await state.ocrWorker.initialize('chi_sim+chi_tra');
         console.log('OCR Worker initialized');
     } catch (error) {
         console.error('OCR Worker initialization failed:', error);

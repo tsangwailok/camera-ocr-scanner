@@ -20,7 +20,7 @@ A Progressive Web App that provides advanced document scanning capabilities with
 - **Camera API**: MediaDevices API (getUserMedia)
 - **Perspective Correction**: OpenCV.js for geometric transformations
 - **Edge Detection**: Canvas-based Canny edge detection algorithm (pure JavaScript)
-- **OCR**: Tesseract.js (JavaScript implementation of Tesseract)
+- **OCR**: Tesseract.js (JavaScript implementation of Tesseract, with Chinese Simplified and Traditional support)
 - **PWA**: Service Workers, Web Manifest, Cache-first strategy
 - **Browser Storage**: IndexedDB for caching
 
@@ -115,7 +115,7 @@ The app implements a Canny edge detection algorithm with the following steps:
 ## OCR Processing
 
 - Uses **Tesseract.js** for text recognition
-- Supports multiple languages (default: English)
+- Supports Chinese Simplified and Traditional (default)
 - All processing happens client-side (no data sent to servers)
 - Results can be edited before copying
 
