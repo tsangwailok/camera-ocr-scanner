@@ -24,6 +24,7 @@ const elements = {
     stopCameraBtn: document.getElementById('stopCameraBtn'),
     captureBtn: document.getElementById('captureBtn'),
     flashBtn: document.getElementById('flashBtn'),
+    autoCorrectBtn: document.getElementById('autoCorrectBtn'),
     correctPerspectiveBtn: document.getElementById('correctPerspectiveBtn'),
     edgeDetectBtn: document.getElementById('edgeDetectBtn'),
     ocrBtn: document.getElementById('ocrBtn'),
@@ -161,6 +162,7 @@ function captureImage() {
     elements.previewCanvas.addEventListener('touchend', handlePointerUp);
     
     // Enable processing buttons
+    elements.autoCorrectBtn.disabled = false;
     elements.correctPerspectiveBtn.disabled = false;
     elements.edgeDetectBtn.disabled = false;
     elements.ocrBtn.disabled = false;
@@ -246,15 +248,10 @@ function handlePointerUp(evt) {
     state.dragIndex = -1;
 }
 
-// Correct Perspective
-function correctPerspective() {
-    if (!state.canvas || state.corners.length !== 4) {
-        showStatus('No image or corners defined', 'error');
-        return;
-    }
-
-    if (!state.cvReady) {
-        showStatus('OpenCV not loaded yet, please wait', 'error');
+// Automatic perspective correction using OpenCV.js
+function autoCorrectPerspective() {
+    if (!state.canvas || !state.cvReady) {
+        showStatus('No image or OpenCV not ready', 'error');
         return;
     }
 
@@ -267,18 +264,80 @@ function correctPerspective() {
             
             // Create OpenCV Mat from image data
             const src = cv.matFromImageData(srcImageData);
+            const gray = new cv.Mat();
+            const blurred = new cv.Mat();
+            const edged = new cv.Mat();
             
-            // Define source and destination points
-            const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
-                state.corners[0].x, state.corners[0].y,
-                state.corners[1].x, state.corners[1].y,
-                state.corners[2].x, state.corners[2].y,
-                state.corners[3].x, state.corners[3].y
-            ]);
+            // Convert to grayscale
+            cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
             
-            // Destination rectangle (A4 aspect ratio)
+            // Apply Gaussian blur
+            cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+            
+            // Apply Canny edge detection
+            cv.Canny(blurred, edged, 75, 200);
+            
+            // Find contours
+            const contours = new cv.MatVector();
+            const hierarchy = new cv.Mat();
+            cv.findContours(edged, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+            
+            // Find the largest quadrilateral contour
+            let maxArea = 0;
+            let docContour = null;
+            
+            for (let i = 0; i < contours.size(); ++i) {
+                const contour = contours.get(i);
+                const area = cv.contourArea(contour);
+                
+                if (area > maxArea) {
+                    const peri = cv.arcLength(contour, true);
+                    const approx = new cv.Mat();
+                    cv.approxPolyDP(contour, approx, 0.02 * peri, true);
+                    
+                    if (approx.rows === 4) {
+                        maxArea = area;
+                        if (docContour) docContour.delete(); // Delete previous
+                        docContour = approx.clone(); // Clone to keep it
+                    }
+                    approx.delete();
+                }
+            }
+            
+            if (!docContour) {
+                showStatus('No document contour found', 'error');
+                // Clean up
+                src.delete(); gray.delete(); blurred.delete(); edged.delete();
+                contours.delete(); hierarchy.delete();
+                showProcessing(false);
+                return;
+            }
+            
+            // Extract corner points
+            const corners = [];
+            for (let i = 0; i < 4; i++) {
+                corners.push({
+                    x: docContour.data32S[i * 2],
+                    y: docContour.data32S[i * 2 + 1]
+                });
+            }
+            
+            // Sort corners: top-left, top-right, bottom-right, bottom-left
+            corners.sort((a, b) => a.y - b.y);
+            const top = corners.slice(0, 2).sort((a, b) => a.x - b.x);
+            const bottom = corners.slice(2).sort((a, b) => a.x - b.x);
+            const sortedCorners = [top[0], top[1], bottom[1], bottom[0]];
+            
+            // Define destination points
             const destWidth = srcCanvas.width;
-            const destHeight = Math.round(destWidth * 1.414);
+            const destHeight = Math.round(destWidth * 1.414); // A4 aspect
+            
+            const srcPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                sortedCorners[0].x, sortedCorners[0].y,
+                sortedCorners[1].x, sortedCorners[1].y,
+                sortedCorners[2].x, sortedCorners[2].y,
+                sortedCorners[3].x, sortedCorners[3].y
+            ]);
             
             const dstPoints = cv.matFromArray(4, 1, cv.CV_32FC2, [
                 0, 0,
@@ -287,10 +346,10 @@ function correctPerspective() {
                 0, destHeight
             ]);
             
-            // Get perspective transform matrix
+            // Get perspective transform
             const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
             
-            // Apply perspective transformation
+            // Apply transformation
             const dst = new cv.Mat();
             cv.warpPerspective(src, dst, M, new cv.Size(destWidth, destHeight), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
             
@@ -302,7 +361,7 @@ function correctPerspective() {
             // Update current image
             state.currentImage = state.canvas.toDataURL('image/jpeg');
             
-            // Reset corners
+            // Update corners for manual adjustment if needed
             state.corners = [
                 { x: 0, y: 0 },
                 { x: destWidth, y: 0 },
@@ -313,17 +372,16 @@ function correctPerspective() {
             // Redraw
             drawImageWithCorners();
             
-            // Clean up
-            src.delete();
-            srcPoints.delete();
-            dstPoints.delete();
-            M.delete();
-            dst.delete();
+            showStatus('Automatic perspective correction completed', 'success');
             
-            showStatus('Perspective corrected successfully', 'success');
+            // Clean up
+            src.delete(); gray.delete(); blurred.delete(); edged.delete();
+            contours.delete(); hierarchy.delete(); docContour.delete();
+            srcPoints.delete(); dstPoints.delete(); M.delete(); dst.delete();
+            
         } catch (error) {
-            console.error('Perspective correction error:', error);
-            showStatus(`Perspective correction error: ${error.message}`, 'error');
+            console.error('Auto perspective correction error:', error);
+            showStatus(`Auto correction error: ${error.message}`, 'error');
         }
 
         showProcessing(false);
@@ -594,6 +652,7 @@ function updateButtonStates() {
     elements.flashBtn.disabled = !state.cameraActive;
     
     if (!state.currentImage) {
+        elements.autoCorrectBtn.disabled = true;
         elements.correctPerspectiveBtn.disabled = true;
         elements.edgeDetectBtn.disabled = true;
         elements.ocrBtn.disabled = true;
@@ -617,6 +676,7 @@ elements.startCameraBtn.addEventListener('click', startCamera);
 elements.stopCameraBtn.addEventListener('click', stopCamera);
 elements.captureBtn.addEventListener('click', captureImage);
 elements.flashBtn.addEventListener('click', toggleFlash);
+elements.autoCorrectBtn.addEventListener('click', autoCorrectPerspective);
 elements.correctPerspectiveBtn.addEventListener('click', correctPerspective);
 elements.edgeDetectBtn.addEventListener('click', detectEdges);
 elements.ocrBtn.addEventListener('click', extractTextOCR);
